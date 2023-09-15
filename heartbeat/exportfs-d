@@ -173,18 +173,6 @@ exportfs_methods() {
 	EOF
 }
 
-reset_fsid() {
-	CURRENT_FSID=$OCF_RESKEY_fsid
-	[ -z "$CURRENT_FSID" ] && CURRENT_FSID=`echo "$OCF_RESKEY_options" | sed -n 's/.*fsid=\([^,]*\).*/\1/p'`
-	echo $CURRENT_FSID
-}
-bump_fsid() {
-	CURRENT_FSID=$((CURRENT_FSID+1))
-}
-get_fsid() {
-	echo $CURRENT_FSID
-}
-
 # run a function on all directories
 forall() {
 	local func=$1
@@ -195,11 +183,10 @@ forall() {
 		fast_exit=1
 		shift 1
 	fi
-	reset_fsid
+
 	for dir in $OCF_RESKEY_directory; do
 		$func $dir "$@"
 		rc=$(($rc | $?))
-		[ $NUMDIRS -gt 1 ] && bump_fsid
 		[ "$fast_exit" ] && continue
 		[ $rc -ne 0 ] && return $rc
 	done
@@ -311,13 +298,7 @@ export_one() {
 		opts="$OCF_RESKEY_options"
 		sep=","
 	fi
-	if echo "$opts" | grep fsid >/dev/null; then
-		#replace fsid in options list
-		opts=`echo "$opts" | sed "s,fsid=[^,]*,fsid=$(get_fsid),g"`
-	elif [ -n "$OCF_RESKEY_fsid" ]; then
-		#tack the fsid option onto our options list.
-		opts="${opts}${sep}fsid=$(get_fsid)"
-	fi
+
 	opts="-o $opts"
 
 	# if any of directories fails to export we can exit
@@ -375,21 +356,7 @@ wait_for_leasetime() {
 		ocf_log warn "Unable to read NFSv4 lease time from ${leasetimefile}, file not found or not readable"
 	fi
 }
-cleanup_export_cache() {
-	# see if the cache is blocking unexport
-	local contentfile=/proc/net/rpc/nfsd.export/content
-	local fsid_re
-	local i=1
-	fsid_re="fsid=(echo `forall get_fsid`|sed 's/ /|/g'),"
-	while :; do
-		grep -E -q "$fsid_re" $contentfile ||
-			break
-		ocf_log info "Cleanup export cache ... (try $i)"
-		ocf_run exportfs -f
-		sleep 0.5
-		i=$((i + 1))
-	done
-}
+
 unexport_one() {
 	local dir=$1
 	ocf_run exportfs -v -u ${OCF_RESKEY_clientspec}:$dir
@@ -423,7 +390,7 @@ exportfs_stop ()
 	fi
 
 	if [ $rc -eq 0 ]; then
-		cleanup_export_cache
+		exportfs -f
 		ha_pseudo_resource "${OCF_RESOURCE_INSTANCE}" stop
 
 		ocf_log info "Un-exported file system(s)"
@@ -434,18 +401,6 @@ exportfs_stop ()
 	fi
 }
 
-exportfs_validate_all ()
-{
-	if echo "$OCF_RESKEY_fsid" | grep -q -F ','; then
-		ocf_exit_reason "$OCF_RESKEY_fsid cannot contain a comma"
-		return $OCF_ERR_CONFIGURED
-	fi
-	if [ $NUMDIRS -gt 1 ] && [ -n "$(reset_fsid)" ] &&
-			! ocf_is_decimal "$(reset_fsid)"; then
-		ocf_exit_reason "use integer fsid when exporting multiple directories"
-		return $OCF_ERR_CONFIGURED
-	fi
-}
 
 for dir in $OCF_RESKEY_directory; do
 	# strip off trailing '/' from directory
