@@ -23,7 +23,7 @@ OCF_RESKEY_rmtab_backup_default=".rmtab"
 : ${OCF_RESKEY_rmtab_backup=${OCF_RESKEY_rmtab_backup_default}}
 #######################################################################
 
-exportfs_meta_data() {
+exportfs-d_meta_data() {
 	cat <<END
 <?xml version="1.0"?>
 <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
@@ -160,7 +160,7 @@ END
 return $OCF_SUCCESS
 }
 
-exportfs_methods() {
+exportfs-d_methods() {
   cat <<-EOF
 	start
 	stop
@@ -217,7 +217,7 @@ restore_rmtab() {
 	fi
 }
 
-exportfs_usage() {
+exportfs-d_usage() {
 	cat <<END
 		usage: $0 {start|stop|monitor|status|validate-all|meta-data}
 END
@@ -251,7 +251,7 @@ is_exported() {
 	return $rc
 }
 
-exportfs_monitor ()
+exportfs-d_monitor ()
 {
 	local spec
 
@@ -291,7 +291,7 @@ testdir() {
 	return 0
 }
 
-exportfs_start ()
+exportfs-d_start ()
 {
 	if ! forall testdir; then
 		return $OCF_ERR_INSTALLED
@@ -327,7 +327,7 @@ wait_for_leasetime() {
 	fi
 }
 
-exportfs_stop ()
+exportfs-d_stop ()
 {
 	local rc
 
@@ -400,5 +400,5 @@ OCF_RESKEY_directory="${directories%% }"
 
 NUMDIRS=`echo "$OCF_RESKEY_directory" | wc -w`
 OCF_REQUIRED_PARAMS="directory clientspec"
-OCF_REQUIRED_BINARIES="exportfs"
+OCF_REQUIRED_BINARIES="exportfs systemctl"
 ocf_rarun $*
