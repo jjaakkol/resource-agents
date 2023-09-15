@@ -1,11 +1,11 @@
 #!/bin/sh
 # exportfs
 #
-# Description: Manages nfs exported file system.
+# Description: Manages nfs exports with /etc/exports.d directory
 #
 #   (c) 2010 Ben Timby, Florian Haas, Dejan Muhamedagic,
 #            and Linux-HA contributors
-#
+#   by Jani Jaakkola from a copy of exportfs script
 # License: GNU General Public License v2 (GPLv2) and later
 
 #######################################################################
@@ -31,14 +31,26 @@ exportfs_meta_data() {
 <version>1.0</version>
 
 <longdesc lang="en">
-Exportfs uses the exportfs command to add/remove nfs exports.
+Exportfs-d adds NFS exports to /etc/exports.d directory in a file
+with a same name as the created resource.
+When using /etc/exports.d NFS server can safely be restarted without
+losing exports. On stop exportfs does restart the NFS server
+to make sure that all exported files are really closed and the
+exported fs can be safely unmounted.
 It does NOT manage the nfs server daemon.
 It depends on Linux specific NFS implementation details,
-so is considered not portable to other platforms yet.
+so it is not portable to other platforms yet.
+
+This resource is an alternative for the exportfs resource. You should
+use only one of them.
+
+Unlike exportfs this resource does not manage the fsid export option.
+NFS server can manage the fs fsid by itself, but if you want to
+specify a fsid add it to the options parameter.
 </longdesc>
 
 <shortdesc lang="en">
-Manages NFS exports
+Manages NFS exports with /etc/exports.d directory.
 </shortdesc>
 
 <parameters>
@@ -62,7 +74,7 @@ Client ACL.
 
 <parameter name="options" unique="0" required="0">
 <longdesc lang="en">
-The options to pass to exportfs for the exported directory
+The options to pass to add to exports.d for the exported directory
 or directories.
 </longdesc>
 <shortdesc lang="en">
@@ -82,42 +94,20 @@ The directory or directories to export.
 <content type="string" />
 </parameter>
 
-<parameter name="fsid" unique="0" required="0">
+<parameter name="server_restart_on_stop">
 <longdesc lang="en">
-The fsid option to pass to exportfs. This can be a unique positive
-integer, a UUID (assuredly sans comma characters), or the special string
-"root" which is functionally identical to numeric fsid of 0.
-If multiple directories are being exported, then they are
-assigned ids sequentially starting with this fsid (fsid, fsid+1,
-fsid+2, ...). Obviously, in that case the fsid must be an
-integer.
-0 (root) identifies the export as the root of an NFSv4
-pseudofilesystem -- avoid this setting unless you understand its
-special status.
-This value will override any fsid provided via the options parameter.
+If set to true this restarts the nfs server when the resource stops,
+so that all files opened and locks by the NFS server are closed. 
+This makes sure that the exported filesystem can be umounted.
+
+This is incompatible with the exportfs resource agent! Server restart
+makes Linux NFS server forget all shares which are not in /etc/exports
+file /etc/exports.d directory.
 </longdesc>
 <shortdesc lang="en">
-Unique fsid within cluster or starting fsid for multiple exports.
+server_restart_on_stop?
 </shortdesc>
-<content type="string" />
-</parameter>
-
-<parameter name="unlock_on_stop">
-<longdesc lang="en">
-Relinquish NFS locks associated with this filesystem when the resource
-stops. Enabling this parameter is highly recommended unless the path exported
-by this ${__SCRIPT_NAME} resource is also exported by a different resource.
-
-Note: Unlocking is only possible on Linux systems where
-/proc/fs/nfsd/unlock_filesystem exists and is writable. If your system does
-not fulfill this requirement (on account of having an nonrecent kernel,
-for example), you may set this parameter to 0 to silence the associated
-warning.
-</longdesc>
-<shortdesc lang="en">
-Unlock filesystem on stop?
-</shortdesc>
-<content type="boolean" default="${OCF_RESKEY_unlock_on_stop_default}" />
+<content type="boolean" default="${OCF_RESKEY_server_restart_on_stop_default}" />
 </parameter>
 
 <parameter name="wait_for_leasetime_on_stop">
